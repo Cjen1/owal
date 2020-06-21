@@ -1,0 +1,3 @@
+(tests
+ (names owal)
+ (libraries base core owal alcotest alcotest-lwt))
