@@ -21,14 +21,14 @@ module T = Persistant(T_p)
 let test_file = "test.tmp"
 
 let test_seq = [1;5;2;4]
-let op_seq = test_seq |> List.map (fun i -> T_p.Write i)
+let op_seq = test_seq |> List.map (fun i -> T_p.Write i) |> List.rev
 
 let init switch () = 
   Lwt_switch.add_hook_or_exec (Some switch) (fun () -> Lwt_unix.unlink test_file)
 
 let test_change_sync _ () = 
   T.of_file test_file >>= fun t ->
-  let t = List.fold_right (fun op t -> T.change t op) op_seq t in
+  List.iter (fun op -> T.change t op) op_seq;
   Alcotest.(check @@ list int) "Apply ops to t" t.t test_seq;
   T.sync t >|= Result.get_ok >>= fun () ->
   T.close t

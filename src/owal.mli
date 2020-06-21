@@ -15,7 +15,7 @@ end
 
 module Persistant (P : Persistable) : sig
   type t =
-    { t: P.t
+    { mutable t: P.t
     ; mutable write_promise: (unit,exn) Lwt_result.t
     ; fd: Lwt_unix.file_descr
     ; channel: Lwt_io.output_channel }
@@ -26,7 +26,7 @@ module Persistant (P : Persistable) : sig
 
   val of_file : string -> t Lwt.t
 
-  val change : t -> op -> t
+  val change : t -> op -> unit
 
   val close : t -> unit Lwt.t
 end 

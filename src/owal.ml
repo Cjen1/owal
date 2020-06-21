@@ -24,7 +24,7 @@ module Persistant (P : Persistable) = struct
   include P
 
   type t =
-    { t: P.t
+    { mutable t: P.t
     ; mutable write_promise: (unit, exn) Lwt_result.t
     ; fd: Lwt_unix.file_descr
     ; channel: Lwt_io.output_channel }
@@ -92,7 +92,7 @@ module Persistant (P : Persistable) = struct
 
   let change t op =
     write t op ;
-    {t with t= P.apply t.t op}
+    t.t <- P.apply t.t op
 
   let close t = 
     t.write_promise >>= function 
