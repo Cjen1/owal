@@ -1,3 +1,4 @@
 (library
-  (name owal)
-  (libraries base lwt lwt.unix logs logs.fmt fmt.tty))
+ (name owal)
+ (public_name owal)
+ (libraries base lwt lwt.unix logs logs.fmt fmt.tty))

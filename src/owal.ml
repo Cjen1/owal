@@ -4,7 +4,7 @@ let src = Logs.Src.create "Owal"
 
 module Log = (val Logs.src_log src : Logs.LOG)
 
-let (>>>=) = Lwt_result.bind
+let ( >>>= ) = Lwt_result.bind
 
 module type Persistable = sig
   type t
@@ -24,8 +24,8 @@ module Persistant (P : Persistable) = struct
   include P
 
   type t =
-    { mutable t: P.t
-    ; mutable write_promise: (unit, exn) Lwt_result.t
+    { t: P.t
+    ; write_promise: (unit, exn) Lwt_result.t
     ; fd: Lwt_unix.file_descr
     ; channel: Lwt_io.output_channel }
 
@@ -34,34 +34,35 @@ module Persistant (P : Persistable) = struct
     let buf = Bytes.create (p_len + 8) in
     p_blit buf ~offset:8 ;
     EndianBytes.LittleEndian.set_int64 buf 0 (Int64.of_int p_len) ;
-    let write_p = t.write_promise >>>= fun () -> 
-        Lwt_io.write_from_exactly t.channel buf 0 (Bytes.length buf) >>= Lwt.return_ok
-    in 
-    t.write_promise <- write_p
+    let write_p =
+      t.write_promise
+      >>>= fun () ->
+      Lwt_io.write_from_exactly t.channel buf 0 (Bytes.length buf)
+      >>= Lwt.return_ok
+    in
+    {t with write_promise= write_p}
 
   let sync t =
     let write_promise = t.write_promise in
     write_promise
-    >>= function 
-    | Error exn -> 
-      Log.err (fun m -> m "Got error from write_promise %a" Fmt.exn exn);
-      Lwt.return_error exn
+    >>= function
+    | Error exn ->
+        Log.err (fun m -> m "Got error from write_promise %a" Fmt.exn exn) ;
+        Lwt.return_error exn
     | Ok () ->
-      (* All pending writes now complete *)
-      Lwt_io.flush t.channel
-      >>= fun () ->
-      Lwt_unix.fsync t.fd
-      >>= fun () ->
-      Logs.debug (fun m -> m "Finished syncing") ;
-      Lwt.return_ok ()
+        (* All pending writes now complete *)
+        Lwt_io.flush t.channel
+        >>= fun () ->
+        Lwt_unix.fsync t.fd
+        >>= fun () ->
+        Logs.debug (fun m -> m "Finished syncing") ;
+        Lwt.return_ok ()
 
   let read_value channel =
     let rd_buf = Bytes.create 8 in
     Lwt_io.read_into_exactly channel rd_buf 0 8
     >>= fun () ->
-    let size =
-      EndianBytes.LittleEndian.get_int64 rd_buf 0 |> Int64.to_int
-    in
+    let size = EndianBytes.LittleEndian.get_int64 rd_buf 0 |> Int64.to_int in
     let payload_buf = Bytes.create size in
     Lwt_io.read_into_exactly channel payload_buf 0 size
     >>= fun () -> payload_buf |> Lwt.return
@@ -90,16 +91,23 @@ module Persistant (P : Persistable) = struct
     let channel = Lwt_io.of_fd ~mode:Lwt_io.output fd in
     Lwt.return {t; write_promise= Lwt.return_ok (); fd; channel}
 
-  let change t op =
-    write t op ;
-    t.t <- P.apply t.t op
+  let change t op = {(write t op) with t= P.apply t.t op}
 
-  let close t = 
-    t.write_promise >>= function 
-    | Error exn -> (Log.err (fun m -> m "Error on write promise %a" Fmt.exn exn); Lwt.return_unit)
-    | Ok () -> 
-    Lwt.catch (fun () -> Lwt_io.close t.channel >>= Lwt.return_ok ) Lwt.return_error
-    >>= function 
-    | Ok () -> (Log.info (fun m -> m "Closed wal successfully"); Lwt.return_unit)
-    | Error exn -> (Log.err (fun m -> m "Failed to close wal with %a" Fmt.exn exn); Lwt.return_unit)
+  let close t =
+    t.write_promise
+    >>= function
+    | Error exn ->
+        Log.err (fun m -> m "Error on write promise %a" Fmt.exn exn) ;
+        Lwt.return_unit
+    | Ok () -> (
+        Lwt.catch
+          (fun () -> Lwt_io.close t.channel >>= Lwt.return_ok)
+          Lwt.return_error
+        >>= function
+        | Ok () ->
+            Log.info (fun m -> m "Closed wal successfully") ;
+            Lwt.return_unit
+        | Error exn ->
+            Log.err (fun m -> m "Failed to close wal with %a" Fmt.exn exn) ;
+            Lwt.return_unit )
 end
