@@ -25,7 +25,7 @@ module Persistant (P : Persistable) : sig
 
   val of_file : string -> t Lwt.t
 
-  val change : t -> op -> t
+  val change : op -> t -> t
 
   val close : t -> unit Lwt.t
 end

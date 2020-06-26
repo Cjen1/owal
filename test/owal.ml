@@ -35,7 +35,7 @@ let init switch () =
 let test_change_sync _ () =
   T.of_file test_file
   >>= fun t ->
-  let t = List.fold_left (fun t op -> T.change t op) t op_seq in
+  let t = List.fold_left (fun t op -> T.change op t) t op_seq in
   Alcotest.(check @@ list int) "Apply ops to t" t.t test_seq ;
   T.sync t >|= Result.get_ok >>= fun () -> T.close t
 

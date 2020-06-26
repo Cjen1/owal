@@ -38,7 +38,7 @@ let throughput n () =
   >>= fun t ->
   let ops = List.init n (fun _ -> Random.int 100000) in
   let test () =
-    List.fold_left (fun t v -> T.change t (T_p.Write v)) t ops
+    List.fold_left (fun t v -> T.change (T_p.Write v) t) t ops
     |> T.sync |> Lwt_result.get_exn
   in
   Log.info (fun m -> m "Starting throughput test") ;

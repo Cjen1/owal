@@ -91,7 +91,7 @@ module Persistant (P : Persistable) = struct
     let channel = Lwt_io.of_fd ~mode:Lwt_io.output fd in
     Lwt.return {t; write_promise= Lwt.return_ok (); fd; channel}
 
-  let change t op = {(write t op) with t= P.apply t.t op}
+  let change op t = {(write t op) with t= P.apply t.t op}
 
   let close t =
     t.write_promise
