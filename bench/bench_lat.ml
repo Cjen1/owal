@@ -37,16 +37,15 @@ let throughput n () =
   T.of_file test_file
   >>= fun t ->
   let ops = List.init n (fun _ -> Random.int 100000) in
-  let test () =
-    List.fold_left
-      (fun t v ->
-        t
-        >>= fun t ->
-        let t = T.change (T_p.Write v) t in
-        T.sync t |> Lwt_result.get_exn >>= fun () -> Lwt.return t)
-      (Lwt.return t) ops
-    >>= fun _ -> Lwt.return_unit
-  in
+  let ops_stream = Lwt_stream.of_list ops in
+  let t_r = ref t in
+  let test () = 
+    Lwt_stream.iter_n ~max_concurrency:128
+      (fun v ->
+         t_r := T.change (T_p.Write v) !t_r;
+         T.sync !t_r |> Lwt_result.get_exn
+      ) ops_stream
+  in 
   Log.info (fun m -> m "Starting throughput test") ;
   time_it test
   >>= fun time ->
@@ -77,5 +76,5 @@ let reporter =
 let () =
   Logs.(set_level (Some Info)) ;
   Logs.set_reporter reporter ;
-  let res = Lwt_main.run @@ throughput 100 () in
+  let res = Lwt_main.run @@ throughput 1000 () in
   Unix.unlink test_file ; print_endline res
